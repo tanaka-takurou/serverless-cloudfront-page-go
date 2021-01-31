@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless CloudFront Page
+
+Parameters:
+  ApplicationName:
+    Type: String
+    Default: 'ServerlessCloudFrontPage'
+  FrontPageApiStageName:
+    Type: String
+    Default: 'ProdStage'
+  FrontPageFunctionName:
+    Type: String
+    Default: 'CloudFrontSampleFunction'
+  DistributionOriginId:
+    Type: String
+    Default: 'CloudFrontDistributionOrigin0'
+  CloudFrontCachePolicyName:
+    Type: String
+    Default: 'CloudFrontCachePolicy0'
+
+Resources:
+  FrontPageApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: ServerlessCloudFrontPageApi
+      EndpointConfiguration: REGIONAL
+      StageName: !Ref FrontPageApiStageName
+  FrontPageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref FrontPageFunctionName
+      CodeUri: bin/
+      Handler: main
+      MemorySize: 256
+      Runtime: go1.x
+      Description: 'CloudFront Function'
+      Role: !GetAtt FrontPageFunctionRole.Arn
+      Environment:
+        Variables:
+          REGION: !Ref 'AWS::Region'
+      Events:
+        FrontPageApi:
+          Type: Api
+          Properties:
+            Path: '/'
+            Method: get
+            RestApiId: !Ref FrontPageApi
+  FrontPageFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+                - edgelambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'ServerlessCloudFrontPagePolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - "cloudfront:List*"
+                Resource: '*'
+  CloudFrontCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        DefaultTTL: 86400
+        MaxTTL: 31536000
+        MinTTL: 0
+        Name: !Ref CloudFrontCachePolicyName
+        ParametersInCacheKeyAndForwardedToOrigin:
+          CookiesConfig:
+            CookieBehavior: 'none'
+          EnableAcceptEncodingBrotli: false
+          EnableAcceptEncodingGzip: false
+          HeadersConfig:
+            HeaderBehavior: 'none'
+          QueryStringsConfig:
+            QueryStringBehavior: 'none'
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        DefaultCacheBehavior:
+          CachePolicyId: !Ref CloudFrontCachePolicy
+          TargetOriginId: !Ref DistributionOriginId
+          ViewerProtocolPolicy: 'redirect-to-https'
+        Enabled: true
+        Origins:
+          - Id: !Ref DistributionOriginId
+            DomainName: !Join [ '', [ !Ref FrontPageApi, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com'] ]
+            OriginPath: !Join [ '', [ '/',!Ref FrontPageApiStageName] ]
+            CustomOriginConfig:
+              OriginProtocolPolicy: 'https-only'
+              OriginKeepaliveTimeout: 5
+              OriginReadTimeout: 30
+
+Outputs:
+  APIURI:
+    Description: "URI"
+    Value: !Join [ '', [ 'https://', !Ref FrontPageApi, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref FrontPageApiStageName,'/'] ]
