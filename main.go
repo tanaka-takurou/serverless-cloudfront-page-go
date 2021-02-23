@@ -5,6 +5,7 @@ import (
 	"os"
 	"log"
 	"bytes"
+	"embed"
 	"errors"
 	"context"
 	"encoding/json"
@@ -32,6 +33,8 @@ type Response events.APIGatewayProxyResponse
 
 const title string = "Sample AWS CloudFront Page"
 
+//go:embed templates
+var templateFS embed.FS
 var cloudfrontClient *cloudfront.Client
 
 func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (Response, error) {
@@ -49,7 +52,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	} else {
 		dat.Result = distribution
 	}
-	tmp = template.Must(template.New("").Funcs(funcMap).ParseFiles("templates/index.html", "templates/view.html", "templates/header.html"))
+	tmp = template.Must(template.New("").Funcs(funcMap).ParseFS(templateFS, "templates/index.html", "templates/view.html", "templates/header.html"))
 	if e := tmp.ExecuteTemplate(fw, "base", dat); e != nil {
 		log.Fatal(e)
 	}
