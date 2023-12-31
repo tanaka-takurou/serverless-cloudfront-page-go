@@ -29,11 +29,13 @@ Resources:
   FrontPageFunction:
     Type: AWS::Serverless::Function
     Properties:
+      Architectures:
+      - arm64
       FunctionName: !Ref FrontPageFunctionName
       CodeUri: bin/
-      Handler: main
+      Handler: bootstrap
       MemorySize: 256
-      Runtime: go1.x
+      Runtime: provided.al2
       Description: 'CloudFront Function'
       Role: !GetAtt FrontPageFunctionRole.Arn
       Environment:
